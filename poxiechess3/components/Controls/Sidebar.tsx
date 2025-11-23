@@ -16,6 +16,9 @@ interface SidebarProps {
     setSkillLevel: (n: number) => void;
     statusText: string;
     pgn: string;
+    // New props for book toggle
+    isBookDisabled: boolean;
+    onToggleBook: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -24,7 +27,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
     blackStrategy, setBlackStrategy,
     currentStrategyName,
     skillLevel, setSkillLevel,
-    statusText, pgn
+    statusText, pgn,
+    isBookDisabled, onToggleBook
 }) => {
     
     const getHumanityLabel = (val: number) => {
@@ -60,10 +64,32 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 </div>
 
                 <div className="space-y-3 bg-slate-700/30 p-3 rounded-lg border border-slate-700">
-                    <div className="flex justify-between items-center">
+                    <div className="flex justify-between items-center mb-2">
                         <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Strategy</h3>
                         <span className="text-[10px] text-blue-400 font-mono">{currentStrategyName}</span>
                     </div>
+
+                    <button 
+                        onClick={onToggleBook} 
+                        className={`w-full mb-3 py-1.5 text-[10px] font-bold uppercase rounded border transition-colors flex items-center justify-center gap-2
+                            ${isBookDisabled 
+                                ? 'bg-red-500/10 text-red-400 border-red-500/30 hover:bg-red-500/20' 
+                                : 'bg-green-500/10 text-green-400 border-green-500/30 hover:bg-green-500/20'
+                            }`}
+                    >
+                        {isBookDisabled ? (
+                            <>
+                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+                                Book Disabled (Engine Only)
+                            </>
+                        ) : (
+                            <>
+                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+                                Opening Book Active
+                            </>
+                        )}
+                    </button>
+
                     <div>
                         <label className="text-[10px] text-slate-400 block mb-1">WHITE STYLE</label>
                         <select 

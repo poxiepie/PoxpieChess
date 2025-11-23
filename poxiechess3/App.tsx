@@ -32,6 +32,7 @@ const App: React.FC = () => {
   const [blackStrategy, setBlackStrategy] = useState<StrategyType>('auto');
   const [activeStrategy, setActiveStrategy] = useState<StrategyType>('auto');
   const [strategyDisplay, setStrategyDisplay] = useState("Auto-Detecting...");
+  const [isBookDisabled, setIsBookDisabled] = useState(false);
 
   // --- Editor State ---
   const [editorState, setEditorState] = useState<EditorState>({
@@ -52,16 +53,22 @@ const App: React.FC = () => {
     setFen(game.fen());
     
     // Update Strategy Display
-    const { strategy, display } = determineStrategy(
-      playerColor, 
-      whiteStrategy, 
-      blackStrategy, 
-      game.history(), 
-      activeStrategy === 'auto' ? null : activeStrategy
-    );
-    
-    if (activeStrategy !== strategy) setActiveStrategy(strategy);
-    setStrategyDisplay(display);
+    if (isBookDisabled) {
+        setStrategyDisplay("Engine Only (Book Disabled)");
+        // We don't overwrite activeStrategy so it can resume if re-enabled, 
+        // or we could clear it. For now, we just update the display text.
+    } else {
+        const { strategy, display } = determineStrategy(
+          playerColor, 
+          whiteStrategy, 
+          blackStrategy, 
+          game.history(), 
+          activeStrategy === 'auto' ? null : activeStrategy
+        );
+        
+        if (activeStrategy !== strategy) setActiveStrategy(strategy);
+        setStrategyDisplay(display);
+    }
   };
 
   const checkEngineTurn = () => {
@@ -79,9 +86,13 @@ const App: React.FC = () => {
     setAiThinking(true);
     
     // Check Book Move First
-    const strat = determineStrategy(playerColor, whiteStrategy, blackStrategy, game.history(), activeStrategy).strategy;
-    // Pass the full game object for advanced generic fallback logic (captures, occupancy checks)
-    const bookMove = getBookMove(game, strat, playerColor);
+    let bookMove = null;
+    
+    if (!isBookDisabled) {
+        const strat = determineStrategy(playerColor, whiteStrategy, blackStrategy, game.history(), activeStrategy).strategy;
+        // Pass the full game object for advanced generic fallback logic (captures, occupancy checks)
+        bookMove = getBookMove(game, strat, playerColor);
+    }
 
     if (bookMove) {
         // Validate book move legality just in case (though getBookMove handles most)
@@ -287,6 +298,7 @@ const App: React.FC = () => {
       setAiThinking(false);
       engine.stop();
       setActiveStrategy('auto');
+      setIsBookDisabled(false); // Enable book again on reset
       updateGameState();
   };
 
@@ -302,7 +314,9 @@ const App: React.FC = () => {
                game.undo();
            }
       }
-      setActiveStrategy('auto'); // Reset strategy detection
+      // Re-evaluate strategy state after undo (we don't force reset unless we want to)
+      // setActiveStrategy('auto'); 
+      // Actually keeping strategy is often better for undoing mistakes in same opening
       updateGameState();
   };
 
@@ -393,6 +407,12 @@ const App: React.FC = () => {
                     setSkillLevel={setSkillLevel}
                     statusText={statusText}
                     pgn={game.pgn()}
+                    isBookDisabled={isBookDisabled}
+                    onToggleBook={() => {
+                        setIsBookDisabled(prev => !prev);
+                        // Trigger immediate strategy text update
+                        // (Wait for effect is fine, but state update might lag strategy display if not forcing update)
+                    }}
                 />
              )}
              
