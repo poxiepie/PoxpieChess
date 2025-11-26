@@ -11,7 +11,8 @@
   "dependencies": {
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "chess.js": "^1.4.0"
+    "chess.js": "^1.4.0",
+    "pusher-js": "8.4.0-rc2"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

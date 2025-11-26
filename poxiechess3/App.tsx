@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Chess, Square as SquareType, Move, Color, PieceSymbol } from 'chess.js';
+import Pusher from 'pusher-js';
 import { Sidebar } from './components/Controls/Sidebar';
 import { EditorPanel } from './components/Controls/EditorPanel';
 import { Board } from './components/Board/Board';
@@ -33,6 +34,7 @@ const App: React.FC = () => {
   const [activeStrategy, setActiveStrategy] = useState<StrategyType>('auto');
   const [strategyDisplay, setStrategyDisplay] = useState("Auto-Detecting...");
   const [isBookDisabled, setIsBookDisabled] = useState(false);
+  const [isSandboxMode, setIsSandboxMode] = useState(false);
 
   // --- Editor State ---
   const [editorState, setEditorState] = useState<EditorState>({
@@ -42,21 +44,70 @@ const App: React.FC = () => {
     tempBoardFen: ''
   });
 
+  // --- Remote Listener (Termux) ---
+  useEffect(() => {
+    // Initialize Pusher with provided credentials
+    const pusher = new Pusher('e3a0fc41be2ff44a1183', {
+      cluster: 'ap2'
+    });
+
+    // Updated channel name to match Python script
+    const channel = pusher.subscribe('numble-dove-703');
+
+    // Updated event name to match Python script
+    channel.bind('new-move', (data: { san: string, fen?: string }) => {
+        console.log("Remote move received:", data.san);
+        try {
+            // Apply move to the current game instance
+            const result = game.move(data.san);
+            if (result) {
+                // Update state to trigger re-render and engine checks
+                setFen(game.fen());
+                setAiStatus(`Opponent played: ${data.san}`);
+            } else {
+                // Fallback: If SAN move fails (state mismatch), force load FEN from payload
+                if (data.fen) {
+                    console.warn("SAN move failed, syncing via FEN:", data.fen);
+                    game.load(data.fen);
+                    setFen(game.fen());
+                    setAiStatus(`Synced: ${data.san}`);
+                }
+            }
+        } catch (e) {
+            console.warn("Invalid remote move received:", data.san, e);
+            // Extreme Fallback
+            if (data.fen) {
+                try {
+                    game.load(data.fen);
+                    setFen(game.fen());
+                } catch (err) {
+                    console.error("Fatal: Could not sync board", err);
+                }
+            }
+        }
+    });
+
+    return () => {
+        channel.unbind_all();
+        channel.unsubscribe();
+    };
+  }, [game]); // Re-subscribe if game instance resets
+
   // --- Effect: Engine Thinking ---
   useEffect(() => {
     checkEngineTurn();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fen, playerColor, aiThinking]); // Check turn whenever board state changes
+  }, [fen, playerColor, aiThinking, isSandboxMode]); // Check turn whenever board state changes or sandbox toggles
 
   // --- Core Game Helpers ---
   const updateGameState = () => {
     setFen(game.fen());
     
     // Update Strategy Display
-    if (isBookDisabled) {
+    if (isSandboxMode) {
+        setStrategyDisplay("Sandbox Mode (Free Play)");
+    } else if (isBookDisabled) {
         setStrategyDisplay("Engine Only (Book Disabled)");
-        // We don't overwrite activeStrategy so it can resume if re-enabled, 
-        // or we could clear it. For now, we just update the display text.
     } else {
         const { strategy, display } = determineStrategy(
           playerColor, 
@@ -72,13 +123,17 @@ const App: React.FC = () => {
   };
 
   const checkEngineTurn = () => {
-    if (game.isGameOver() || aiThinking || editorState.isActive) return;
+    // Abort if sandbox mode is active
+    if (game.isGameOver() || aiThinking || editorState.isActive || isSandboxMode) return;
 
     const turnColor = game.turn() === 'w' ? 'white' : 'black';
     if (turnColor !== playerColor) {
         triggerAiMove();
     } else {
-        setAiStatus("Stockfish Idle");
+        // If it's player's turn, we might want to reset status unless we just showed a remote move
+        if (!aiStatus.startsWith("Opponent played") && !aiStatus.startsWith("Synced")) {
+            setAiStatus("Stockfish Idle");
+        }
     }
   };
 
@@ -152,13 +207,15 @@ const App: React.FC = () => {
       }
 
       if (game.isGameOver() || aiThinking) return;
-      if (game.turn() !== (playerColor === 'white' ? 'w' : 'b')) return;
+      
+      // Sandbox Mode Bypass: Don't check player color
+      if (!isSandboxMode && game.turn() !== (playerColor === 'white' ? 'w' : 'b')) return;
 
-      // Select own piece
+      // Select piece matching current turn
       const piece = game.get(sq as SquareType);
-      const isOwnPiece = piece && piece.color === game.turn();
+      const isTurnColorPiece = piece && piece.color === game.turn();
 
-      if (isOwnPiece) {
+      if (isTurnColorPiece) {
           if (selectedSquare === sq) {
               // Deselect
               setSelectedSquare(null);
@@ -299,16 +356,18 @@ const App: React.FC = () => {
       engine.stop();
       setActiveStrategy('auto');
       setIsBookDisabled(false); // Enable book again on reset
+      setIsSandboxMode(false); // Disable sandbox on reset
       updateGameState();
   };
 
   const handleUndo = () => {
       if (aiThinking || editorState.isActive) return;
       game.undo();
-      // If playing against AI, undo their move too to get back to user turn
-      if (playerColor !== 'white' && playerColor !== 'black') { 
+      
+      // If playing against AI (and not in sandbox), undo their move too
+      if (!isSandboxMode && playerColor !== 'white' && playerColor !== 'black') { 
           // Mode where AI plays itself? Not implemented.
-      } else {
+      } else if (!isSandboxMode) {
            // Standard 1P vs CPU
            if (game.turn() !== (playerColor === 'white' ? 'w' : 'b')) {
                game.undo();
@@ -410,8 +469,10 @@ const App: React.FC = () => {
                     isBookDisabled={isBookDisabled}
                     onToggleBook={() => {
                         setIsBookDisabled(prev => !prev);
-                        // Trigger immediate strategy text update
-                        // (Wait for effect is fine, but state update might lag strategy display if not forcing update)
+                    }}
+                    isSandboxMode={isSandboxMode}
+                    onToggleSandbox={() => {
+                        setIsSandboxMode(prev => !prev);
                     }}
                 />
              )}

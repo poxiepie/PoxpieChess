@@ -19,6 +19,9 @@ interface SidebarProps {
     // New props for book toggle
     isBookDisabled: boolean;
     onToggleBook: () => void;
+    // New props for sandbox
+    isSandboxMode: boolean;
+    onToggleSandbox: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -28,7 +31,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
     currentStrategyName,
     skillLevel, setSkillLevel,
     statusText, pgn,
-    isBookDisabled, onToggleBook
+    isBookDisabled, onToggleBook,
+    isSandboxMode, onToggleSandbox
 }) => {
     
     const getHumanityLabel = (val: number) => {
@@ -60,6 +64,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     </button>
                     <button onClick={onSwapSides} className="col-span-2 bg-slate-600 hover:bg-slate-500 text-white py-2 rounded font-medium text-xs transition border border-slate-500">
                         Swap Sides (Switch Color)
+                    </button>
+                    <button 
+                        onClick={onToggleSandbox} 
+                        className={`col-span-2 py-2 rounded font-medium text-xs transition border shadow-lg flex items-center justify-center gap-2
+                        ${isSandboxMode 
+                            ? 'bg-yellow-600 hover:bg-yellow-500 text-white border-yellow-500' 
+                            : 'bg-slate-700 hover:bg-slate-600 text-slate-300 border-slate-600'}`}
+                    >
+                        {isSandboxMode ? (
+                            <>
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                                Resume Engine
+                            </>
+                        ) : (
+                            <>
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="10" y1="15" x2="10" y2="9"/><line x1="14" y1="15" x2="14" y2="9"/></svg>
+                                Sandbox Mode (Free Play)
+                            </>
+                        )}
                     </button>
                 </div>
 
