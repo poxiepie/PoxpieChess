@@ -1,0 +1,5 @@
+{
+  "name": "Chess Supervisor & Editor",
+  "description": "A sophisticated Chess application featuring an integrated Stockfish engine supervisor, adaptive strategy detection (London, King's Indian, etc.), and a robust board editor for custom scenario creation.",
+  "requestFramePermissions": []
+}
